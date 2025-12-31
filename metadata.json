@@ -1,0 +1,5 @@
+{
+  "name": "Franklin Bright Smiles",
+  "description": "A conversational AI chatbot to help users with dental inquiries, powered by Gemini. Users can explore cosmetic or general dentistry options and receive sympathetic, informative responses before being guided to book an appointment or learn more.",
+  "requestFramePermissions": []
+}
