@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Message, Sender, ChatState, ButtonInfo, PersistedState } from '../types';
 import ChatMessage from './ChatMessage';
-import { SendIcon, PhoneIcon, StarIcon } from './Icons';
+import { SendIcon, StarIcon } from './Icons';
 import { getSympatheticResponse, getGreetingResponse, extractUserName } from '../services/geminiService';
 
 const STORAGE_KEY = 'franklin_smiles_chat_v1';
@@ -12,7 +11,6 @@ interface ChatbotProps {
 }
 
 const Chatbot: React.FC<ChatbotProps> = ({ onClose }) => {
-  // Initialize with empty, but we'll fill it in the first useEffect
   const [messages, setMessages] = useState<Message[]>([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -23,7 +21,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ onClose }) => {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const isInitialized = useRef(false);
 
-  // Load state or start fresh
   useEffect(() => {
     if (isInitialized.current) return;
 
@@ -31,7 +28,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ onClose }) => {
     if (saved) {
       try {
         const parsed: PersistedState = JSON.parse(saved);
-        // Only restore if data is less than 24 hours old
         if (Date.now() - parsed.lastUpdated < 86400000 && parsed.messages.length > 0) {
           setMessages(parsed.messages);
           setChatState(parsed.chatState);
@@ -44,11 +40,10 @@ const Chatbot: React.FC<ChatbotProps> = ({ onClose }) => {
       }
     }
 
-    // Default first message if no valid history
     setMessages([{
       id: 'init',
       sender: Sender.Bot,
-      text: "Hello! I'm the Franklin Bright Smiles virtual assistant. How can I help you with your dental care today?",
+      text: "Hello! Welcome to Franklin Bright Smiles. I'm here to help you achieve your perfect smile. How can I assist you with your dental care today?",
       buttons: [
         { label: 'Cosmetic Dentistry', payload: 'cosmetic', type: 'service' },
         { label: 'General Dentistry', payload: 'general', type: 'service' },
@@ -57,7 +52,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ onClose }) => {
     isInitialized.current = true;
   }, []);
 
-  // Save state to localStorage
   useEffect(() => {
     if (!isInitialized.current || messages.length === 0) return;
     
@@ -76,7 +70,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ onClose }) => {
     }
   }, [messages, isLoading]);
 
-  // Review count animation
   useEffect(() => {
     let start = 0;
     const end = 1005;
@@ -102,21 +95,24 @@ const Chatbot: React.FC<ChatbotProps> = ({ onClose }) => {
     if(e) e.preventDefault();
     if (!userInput.trim()) return;
 
-    const userMessage = userInput.trim();
-    addMessage(Sender.User, userMessage);
+    const userMsgText = userInput.trim();
+    addMessage(Sender.User, userMsgText);
     setUserInput('');
     setIsLoading(true);
 
-    // Try to extract name if we don't have it
-    if (!userName) {
-        const detectedName = await extractUserName(userMessage);
-        if (detectedName) setUserName(detectedName);
+    let currentName = userName;
+    if (!currentName) {
+        const detectedName = await extractUserName(userMsgText);
+        if (detectedName) {
+            setUserName(detectedName);
+            currentName = detectedName;
+        }
     }
 
-    // Contextual logic: If they greet us again or it's the start
-    if (chatState === ChatState.INITIAL || messages.length < 3) {
-      const historySnippet = messages.slice(-5).map(m => `${m.sender}: ${m.text}`).join('\n');
-      const botGreeting = await getGreetingResponse(userMessage, historySnippet, userName);
+    // Contextual logic
+    if (chatState === ChatState.INITIAL || chatState === ChatState.GREETED) {
+      const historySnippet = messages.slice(-3).map(m => `${m.sender}: ${m.text}`).join('\n');
+      const botGreeting = await getGreetingResponse(userMsgText, historySnippet, currentName);
       
       addMessage(Sender.Bot, botGreeting, [
         { label: 'Cosmetic Dentistry', payload: 'cosmetic', type: 'service' },
@@ -124,12 +120,11 @@ const Chatbot: React.FC<ChatbotProps> = ({ onClose }) => {
       ]);
       setChatState(ChatState.GREETED);
     } else {
-      const botResponse = await getSympatheticResponse(userMessage);
+      const botResponse = await getSympatheticResponse(userMsgText, currentName);
       addMessage(Sender.Bot, botResponse, [
         { label: 'Book Appointment', payload: 'https://www.centaurportal.com/d4w/org-3404/extended_search?location=3930&sourceID=&randomNumber=428da415c42d72a6ac2653e76d73cd2349aed9079f5261eadaa055eedff383e8&shortVer=true', type: 'redirect' },
         { label: 'Oral Health Facts', payload: 'https://teeth.org.au/factsheets', type: 'redirect' },
       ]);
-      setChatState(ChatState.AWAITING_ISSUE);
     }
     setIsLoading(false);
   };
@@ -140,11 +135,11 @@ const Chatbot: React.FC<ChatbotProps> = ({ onClose }) => {
       setIsLoading(true);
       setTimeout(() => {
         if (button.payload === 'cosmetic') {
-          addMessage(Sender.Bot, "That's wonderful. Cosmetic dentistry is our specialty. Are you interested in whitening, veneers, or perhaps a full smile makeover?", [
+          addMessage(Sender.Bot, `${userName ? userName + ', that\'s' : 'That\'s'} a wonderful choice. Cosmetic dentistry is our specialty. Are you interested in whitening, veneers, or perhaps a full smile makeover?`, [
             { label: 'Book Appointment', payload: 'https://www.centaurportal.com/d4w/org-3404/extended_search?location=3930&sourceID=&randomNumber=428da415c42d72a6ac2653e76d73cd2349aed9079f5261eadaa055eedff383e8&shortVer=true', type: 'redirect' },
           ]);
         } else {
-          addMessage(Sender.Bot, "For general care, we provide check-ups, cleanings, and emergency work. Would you like to check our availability?", [
+          addMessage(Sender.Bot, `For general care, we provide check-ups, cleanings, and emergency work. ${userName ? userName + ', would' : 'Would'} you like to check our availability?`, [
             { label: 'View Available Times', payload: 'https://www.centaurportal.com/d4w/org-3404/extended_search?location=3930&sourceID=&randomNumber=428da415c42d72a6ac2653e76d73cd2349aed9079f5261eadaa055eedff383e8&shortVer=true', type: 'redirect' },
           ]);
         }
@@ -162,7 +157,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ onClose }) => {
         setMessages([{
             id: 'init-reset',
             sender: Sender.Bot,
-            text: "History cleared! How can I help you today?",
+            text: "History cleared! How can I help you achieve your perfect smile today?",
             buttons: [
                 { label: 'Cosmetic Dentistry', payload: 'cosmetic', type: 'service' },
                 { label: 'General Dentistry', payload: 'general', type: 'service' },
@@ -173,7 +168,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ onClose }) => {
 
   return (
     <div className="flex flex-col h-full w-full bg-white dark:bg-slate-800 shadow-2xl rounded-t-2xl md:rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700">
-      {/* Header */}
       <div className="p-4 relative bg-[#1E2D78] text-white flex flex-col items-center">
         <h2 className="text-lg font-bold leading-tight">Franklin Bright Smiles</h2>
         <div className="flex items-center gap-2 mt-1">
@@ -201,7 +195,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ onClose }) => {
         </div>
       </div>
 
-      {/* Messages Area */}
       <div ref={chatContainerRef} className="flex-1 p-4 overflow-y-auto bg-slate-50 dark:bg-slate-900">
         {messages.map((msg) => (
           <ChatMessage key={msg.id} message={msg} onButtonClick={handleButtonClick} />
@@ -217,7 +210,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ onClose }) => {
         )}
       </div>
 
-      {/* Input Area */}
       <div className="p-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
         <form onSubmit={handleSendMessage} className="flex items-center gap-2">
           <input

@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from "@google/genai";
 
 const API_KEY = process.env.API_KEY;
@@ -16,78 +15,74 @@ export const getGreetingResponse = async (userGreeting: string, history?: string
       const systemInstruction = `
         You are the warm, welcoming, and professional virtual assistant for Franklin Bright Smiles, a premier dental clinic.
         
-        DYNAMIC CONTEXT:
+        CONTEXT:
         - User's Name: ${userName || 'Unknown'}
-        - Previous Conversation Context: ${history || 'This is the start of a new session.'}
+        - Session: Fresh Greeting Turn.
 
         YOUR TASK:
-        Respond to the user's greeting ("${userGreeting}") contextually.
+        Respond to the user's initial greeting (e.g., "Hi", "Hello", "Hey") with high energy and professional warmth.
         
-        1. If the user just said "Hi", "Hello", or similar:
-           - If returning (history exists): "Welcome back${userName ? ', ' + userName : ''}! Great to see you again. We were previously discussing ${history.toLowerCase().includes('cosmetic') ? 'cosmetic dentistry' : history.toLowerCase().includes('general') ? 'general dental care' : 'your dental health'}. How can I assist you further today?"
-           - If new: "Hello! Welcome to Franklin Bright Smiles. I'm here to help you achieve your perfect smile. Are you looking for information on cosmetic treatments or general dental care?"
+        1. "Hello! Welcome to Franklin Bright Smiles. It's a pleasure to have you here."
+        2. If you don't know their name: "May I ask who I'm speaking with today?"
+        3. Immediate follow-up: "Are you looking for information on cosmetic treatments to transform your smile, or are you here for general dental care?"
         
-        2. If the user's message contains specific questions or names, incorporate them naturally.
-        
-        Tone: Empathetic, luxury-service oriented, concise (2 sentences).
+        Tone: Luxurious, proactive, empathetic. Max 3 sentences.
       `;
       
       const response = await ai.models.generateContent({
           model: model,
-          contents: `The user says: "${userGreeting}"`,
+          contents: `The user said: "${userGreeting}"`,
           config: {
             systemInstruction: systemInstruction,
           }
       });
   
-      return response.text || "Welcome back to Franklin Bright Smiles! How can I help you today?";
+      return response.text || "Hello! Welcome to Franklin Bright Smiles. I'm here to help you achieve your perfect smile. May I ask your name, and are you looking for cosmetic or general dental care today?";
     } catch (error) {
       console.error("Error generating greeting response:", error);
-      return "Welcome back! It's great to see you again. How can we help with your smile today?";
+      return "Hello! Welcome to Franklin Bright Smiles. I'd love to help you today. Are you interested in our cosmetic services or general dental health?";
     }
   };
 
-export const getSympatheticResponse = async (issue: string): Promise<string> => {
+export const getSympatheticResponse = async (issue: string, userName?: string): Promise<string> => {
   try {
     const systemInstruction = `
-      You are a compassionate and knowledgeable dental care coordinator at Franklin Bright Smiles.
+      You are a compassionate dental care coordinator at Franklin Bright Smiles.
       Your response must:
-      1. Empathize with the user's specific concern: "${issue}".
-      2. Briefly explain how Franklin Bright Smiles can help (without medical diagnosis).
-      3. Encourage a professional consultation.
+      1. Use the user's name (${userName || 'there'}) if known.
+      2. Empathize with the specific concern: "${issue}".
+      3. Briefly mention how our world-class clinic handles such cases.
+      4. Encourage booking a consultation.
       
       Length: Concise (2-3 sentences max).
     `;
     
     const response = await ai.models.generateContent({
         model: model,
-        contents: `A user has shared this dental concern/interest: "${issue}".`,
+        contents: `A user shared this concern: "${issue}".`,
         config: {
           systemInstruction: systemInstruction,
         }
     });
 
-    return response.text || "I understand your concern. The best next step is a consultation with our specialists.";
+    return response.text || "I understand your concern. Our specialists at Franklin Bright Smiles would be happy to help you with a consultation.";
   } catch (error) {
     console.error("Error generating sympathetic response:", error);
-    return "I understand your concern. Would you like to book an appointment to have this looked at?";
+    return "I understand your concern. Would you like to book an appointment to have our specialists take a look?";
   }
 };
 
-/**
- * Attempts to extract a name from a user message.
- */
 export const extractUserName = async (text: string): Promise<string | null> => {
     try {
         const response = await ai.models.generateContent({
             model: model,
-            contents: `The user said: "${text}". Extract the person's name if they introduced themselves. Return ONLY the name or "NONE".`,
+            contents: `The user said: "${text}". Extract the person's name if they introduced themselves (e.g. "I'm John", "My name is Sarah"). Return ONLY the name (first name usually) or the word "NONE" if no name is present.`,
             config: {
                 temperature: 0.1,
             }
         });
-        const result = response.text?.trim() || "";
-        if (result.toUpperCase() === "NONE" || result.length > 50) return null;
+        const result = response.text?.trim().replace(/[.]/g, '') || "";
+        if (result.toUpperCase() === "NONE" || result.length > 50 || result.length < 2) return null;
         return result;
     } catch {
         return null;
