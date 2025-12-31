@@ -2,12 +2,12 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  define: {
+    'process.env.API_KEY': JSON.stringify(process.env.API_KEY)
+  },
   build: {
-    // Ensure the output files have simple names for easier embedding if desired, 
-    // though the default hashing is better for caching.
     rollupOptions: {
       output: {
         entryFileNames: 'assets/[name].js',
